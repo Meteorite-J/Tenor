@@ -9,6 +9,7 @@ import polars as pl
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 import httpx
+from gnews import GNews
 
 from mako.lookup import TemplateLookup
 
@@ -23,7 +24,6 @@ QUICK_TEST = IS_DEV # If True, run quickly on first few predictions; useful for 
 
 ENABLE_CITATIONS = False
 
-BATCH_REQUEST_DELAY_SECONDS = 5
 RATE_LIMIT_WAIT_SECONDS = 10
 
 BATCH_SIZE = 100
@@ -150,7 +150,7 @@ async def fetch_from_polymarket() -> pl.DataFrame:
                 return pl.DataFrame([simple_prediction(p) for p in predictions])
 
 
-def get_fred_data() -> pl.DataFrame | None:
+async def get_fred_data() -> pl.DataFrame | None:
     from fredapi import Fred
 
     if not FRED_API_KEY:
@@ -159,25 +159,27 @@ def get_fred_data() -> pl.DataFrame | None:
 
     fred_client = Fred(api_key=FRED_API_KEY)
 
-    out = []
-    for code, title in FRED_CODES.items():
-        print(f"Fetching {title} ({code}) from FRED ...")
+    async def fetch_one(code, title):
+        log.info(f"Fetching {title} ({code}) from FRED ...")
         try:
-            series = fred_client.get_series_latest_release(code)
+            series = await asyncio.to_thread(fred_client.get_series_latest_release, code)
             log.info(f"Fetched {len(series)} data points for FRED {code=}")
             records = [
                 {"date": d.date().isoformat(), "value": float(v)}
                 for d, v in zip(series.index, series.values)
             ]
-            out.append({
+            return {
                 "title": title,
                 "data": records[-NUM_FRED_DATAPOINTS:],
                 "url": f"https://fred.stlouisfed.org/series/{code}"
-            })
+            }
         except Exception as e:
             log.error(f"Failed to fetch FRED {code=}: {e}")
+            return None
 
-    return pl.DataFrame(out)
+    results = await asyncio.gather(*[fetch_one(c, t) for c, t in FRED_CODES.items()])
+    out = [r for r in results if r is not None]
+    return pl.DataFrame(out) if out else None
 
 
 class RelevantPrediction(BaseModel):
@@ -192,8 +194,7 @@ relevant_prediction_agent = Agent(
 )
 
 async def tag_predictions(predictions: pl.DataFrame) -> pl.DataFrame:
-    async def process_batch_with_delay(i: int, batch: pl.DataFrame) -> pl.DataFrame | None:
-        await asyncio.sleep(i * BATCH_REQUEST_DELAY_SECONDS)
+    async def process_batch(i: int, batch: pl.DataFrame) -> pl.DataFrame | None:
         log.info(f"Submitting batch {i} ...")
         try:
             result = await relevant_prediction_agent.run(batch.write_json())
@@ -205,7 +206,7 @@ async def tag_predictions(predictions: pl.DataFrame) -> pl.DataFrame:
         return None
 
     tasks = [
-        process_batch_with_delay(i, batch)
+        process_batch(i, batch)
         for i, batch in enumerate(predictions.select("id", "title", "bets").iter_slices(BATCH_SIZE))
     ]
     results = await asyncio.gather(*tasks)
@@ -247,30 +248,34 @@ EVENTS_QUERIES = [
     "turnaround plan", 'asset sale', "investor day" # corporate events
 ]
 
-def get_events_news() -> pl.DataFrame | None:
-    from gnews import GNews
-    rows, seen = [], set()
-    for query in EVENTS_QUERIES:
+async def get_events_news() -> pl.DataFrame | None:
+    async def fetch_query(query):
         try:
-            for article in GNews().get_news(query):
-                url = article.get("url", "")
-                if url not in seen:
-                    seen.add(url)
-                    rows.append(article)
+            return await asyncio.to_thread(GNews().get_news, query)
         except Exception as e:
             log.error(f"Error fetching event news for query '{query}': {e}")
+            return []
+
+    all_results = await asyncio.gather(*[fetch_query(q) for q in EVENTS_QUERIES])
+    rows, seen = [], set()
+    for articles in all_results:
+        for article in articles:
+            url = article.get("url", "")
+            if url not in seen:
+                seen.add(url)
+                rows.append(article)
     log.info(f"Fetched {len(rows)} deduplicated event-focused headlines from gnews ({len(EVENTS_QUERIES)} queries)")
     return pl.DataFrame(rows) if rows else None
 
 async def get_events() -> pl.DataFrame:
-    events_news = await asyncio.to_thread(get_events_news)
+    events_news = await get_events_news()
     news_input = events_news.select("title", "description").write_json() if events_news is not None else ""
     res = await events_agent.run(news_input)
     return pl.DataFrame(res.output)
 
-def get_news() -> pl.DataFrame | None:
+async def get_news() -> pl.DataFrame | None:
     try:
-        news = GNews().get_top_news()
+        news = await asyncio.to_thread(GNews().get_top_news)
         log.info(f"Fetched {len(news)} news headlines")
         return pl.DataFrame(news)
     except Exception as e:
@@ -284,8 +289,8 @@ async def main():
     tagged_predictions, events, news, fred_data = await asyncio.gather(
         tag_predictions(predictions),
         get_events(),
-        asyncio.to_thread(get_news),
-        asyncio.to_thread(get_fred_data),
+        get_news(),
+        get_fred_data(),
     )
 
     report_input = {

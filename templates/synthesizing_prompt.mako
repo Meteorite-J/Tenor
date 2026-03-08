@@ -6,6 +6,7 @@ You will be provided an array of questions and probabilities from an online bett
     b) a list of upcoming catalyst events.
     c) Some recent important macro datapoints from the FRED.
 Consolidate and summarize into a 1-pager investment guideline thesis report.
+Tailor all analysis specifically to the investor profile described in <about_me>.
 The provided topics column from the prediction markets can serve as hints to explore.
 But think deeply about 2nd and 3rd order effects.
 If any current news or upcoming events can impact these topics, take into account the probabilities and the fact that the topic is being discussed in the first place.

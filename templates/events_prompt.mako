@@ -1,10 +1,11 @@
 <%include file="about_me.mako"/>
 
 <task>
-List key macro events and catalysts that might impact me
-e.g. FED / FOMC meetings, rate cuts, govt shutdowns, major economic prints, major earnings calls,
-investor days, 13F, regulatory events, diplomatic events & visits, trade talks, supreme court decisions,
-tech days, demos, analyst events, headline numbers, trade talks, etc.
-Avoid generic events or ongoing events (like wars) without any concrete timelines or concrete resolutions.
-Also avoid things that can happen far in the future (>1 yr from now).\
+Given the news headlines provided, identify upcoming macro events and catalysts that are most likely to move markets I care about (see <about_me> above).
+Focus on: FED/FOMC meetings, rate decisions, government shutdowns, major economic prints (CPI, jobs, GDP), major earnings calls,
+investor days, 13F filings, regulatory/antitrust events, diplomatic visits, trade talks, Supreme Court decisions,
+tech days, analyst days, M&A announcements, etc.
+For each event: assess whether it has a concrete timeline and a clear potential impact on equities, sectors, rates, commodities, or crypto that I invest in.
+Skip: generic ongoing events (wars, geopolitical tensions) without concrete resolution timelines, events >1 year out, or events with no plausible impact on my investment universe.
+Prioritize events by proximity (soonest first) and potential market impact magnitude.
 </task>
