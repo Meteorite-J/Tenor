@@ -1842,7 +1842,7 @@ wheels = [
 ]
 
 [[package]]
-name = "zeitgeist"
+name = "tenor"
 version = "0.0.1"
 source = { virtual = "." }
 dependencies = [

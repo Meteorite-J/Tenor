@@ -29,9 +29,9 @@ RATE_LIMIT_WAIT_SECONDS = 10
 BATCH_SIZE = 100
 RETRIES = 3
 
-CLASSIFYING_MODEL = "openai:gpt-5-mini-2025-08-07"
-EVENTS_MODEL = "openai:gpt-5.1-2025-11-13"
-SYNTHESIS_MODEL = "openai:gpt-4.1-2025-04-14"
+CLASSIFYING_MODEL = "deepseek:deepseek-chat"
+EVENTS_MODEL = "deepseek:deepseek-chat"
+SYNTHESIS_MODEL = "deepseek:deepseek-chat"
 
 
 today = date.today()
@@ -66,7 +66,7 @@ FRED_CODES = {
     "UMCSENT": "Michigan Consumer Sentiment",
 }
 
-assert "OPENAI_API_KEY" in os.environ, "No OPENAI_API_KEY found; Either add to .env file or run `export OPENAI_API_KEY=???`"
+assert "DEEPSEEK_API_KEY" in os.environ, "No DEEPSEEK_API_KEY found; Either add to .env file or run `export DEEPSEEK_API_KEY=???`"
 assert not(IS_PROD and QUICK_TEST), "QUICK_TEST must be False in GitHub Actions"
 
 ########################################################################################################
@@ -220,13 +220,12 @@ class Event(BaseModel):
     title: str = Field(description="title of macro event or catalyst")
     when: str = Field(description="approximately when; either specific date or stringy like '2025 Q2' or 'next month'")
     url: str | None = Field(description="web url linking to a page with details about the event - okay to skip if url is not available or too generic")
-    topics: str = Field(description="Very short phrase (1-3 words): public companies or investment sectors or broad alternatives impacted")
+    topics: str = Field(description="very short phrase (1-3 words): public companies or investment sectors or broad alternatives impacted")
 
 events_agent = Agent(
     model=EVENTS_MODEL,
     output_type=list[Event],
     system_prompt=templates.get_template("events_prompt.mako").render(today=today),
-    model_settings={"tools": [{"type": "web_search", "search_context_size": "high"}]},
     retries=RETRIES,
 )
 
@@ -237,12 +236,39 @@ synthesizing_agent = Agent(
     retries=RETRIES,
 )
 
+EVENTS_QUERIES = [
+    "Fed", "FOMC meeting",                          # Fed/FOMC
+    "government shutdown", "fiscal policy",         # government/fiscal
+    "economic data release", "jobs report", "CPI",  # economic prints
+    "earnings", "quarterly result",                 # earnings
+    "trade talk", "tariff",                         # trade
+    "Supreme Court", "antitrust",                   # legal/regulatory
+    "FDA approval", "merger", "share buyback",      # corporate events
+    "turnaround plan", 'asset sale', "investor day" # corporate events
+]
+
+def get_events_news() -> pl.DataFrame | None:
+    from gnews import GNews
+    rows, seen = [], set()
+    for query in EVENTS_QUERIES:
+        try:
+            for article in GNews().get_news(query):
+                url = article.get("url", "")
+                if url not in seen:
+                    seen.add(url)
+                    rows.append(article)
+        except Exception as e:
+            log.error(f"Error fetching event news for query '{query}': {e}")
+    log.info(f"Fetched {len(rows)} deduplicated event-focused headlines from gnews ({len(EVENTS_QUERIES)} queries)")
+    return pl.DataFrame(rows) if rows else None
+
 async def get_events() -> pl.DataFrame:
-    res = await events_agent.run()
+    events_news = await asyncio.to_thread(get_events_news)
+    news_input = events_news.select("title", "description").write_json() if events_news is not None else ""
+    res = await events_agent.run(news_input)
     return pl.DataFrame(res.output)
 
 def get_news() -> pl.DataFrame | None:
-    from gnews import GNews
     try:
         news = GNews().get_top_news()
         log.info(f"Fetched {len(news)} news headlines")

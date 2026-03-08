@@ -29,7 +29,7 @@ jobs:
           secrets: ${{toJSON(secrets)}}
 
       - name: Generate report
-        run: uv run python zeitgeist.py
+        run: uv run python tenor.py
 
       - name: Publish report
         uses: peaceiris/actions-gh-pages@v4

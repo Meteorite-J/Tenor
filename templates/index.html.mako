@@ -10,10 +10,10 @@
 </head>
 <body>
 <main>
-    <a href="https://github.com/Meteorite-J/Zeitgeist" target="_blank" rel="noopener" style="float: right;">
+    <a href="https://github.com/Meteorite-J/Tenor" target="_blank" rel="noopener" style="float: right;">
         <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="GitHub" width="30" height="30">
     </a>
-    <a href="https://Meteorite-J.github.io/Zeitgeist/" style="float: right; text-decoration: none; font-size: 28px; margin-right: 10px;">
+    <a href="https://Meteorite-J.github.io/Tenor/" style="float: right; text-decoration: none; font-size: 28px; margin-right: 10px;">
         🔄
     </a>
     ${MarkdownIt().render(report) | n}
