@@ -1,7 +1,7 @@
 <%include file="about_me.mako"/>
 
 <task>
-Given the news headlines provided, identify upcoming macro events and catalysts that are most likely to move markets I care about (see <about_me> above).
+Given the news headlines provided, identify upcoming macro events and catalysts that are most likely to move markets I care about (see <about_me>).
 Focus on: FED/FOMC meetings, rate decisions, government shutdowns, major economic prints (CPI, jobs, GDP), major earnings calls,
 investor days, 13F filings, regulatory/antitrust events, diplomatic visits, trade talks, Supreme Court decisions,
 tech days, analyst days, M&A announcements, etc.
