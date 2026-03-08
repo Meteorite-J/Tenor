@@ -1,0 +1,39 @@
+name: Daily Report
+
+on:
+  workflow_dispatch: # enables to manually trigger this job
+  schedule:
+    - cron: '0 11 * * *' # Daily at 6am ET (11am UTC during EST)
+
+jobs:
+  report:
+    name: Make report
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - uses: oNaiPs/secrets-to-env-action@v1
+        with:
+          secrets: ${{toJSON(secrets)}}
+
+      - name: Generate report
+        run: uv run python zeitgeist.py
+
+      - name: Publish report
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{secrets.GITHUB_TOKEN}}
+          publish_dir: .reports
+          keep_files: true
